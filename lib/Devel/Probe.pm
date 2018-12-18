@@ -38,15 +38,21 @@ Version 0.000001
 =head1 SYNOPSIS
 
     use Devel::Probe;
+    # or
+    use Devel::Probe (check => 0);
+    # or
     use Devel::Probe (check => 1);
     ...
 
 =head1 DESCRIPTION
 
 Use this module to allow the possibility of creating probes for some lines in
-your code.  By default the probing is disabled, but if you pass C<check =E<gt>
-1>, it will immediately check for a configuration file, as when reacting to
-C<SIGHUP> (see below).
+your code.
+
+By default the probing is disabled, but if you import the module with C<check
+=E<gt> 1>, it will immediately check for a configuration file, as when reacting
+to C<SIGHUP> (see below).  Using C<check =E<gt> 0> is equivalent to the
+default, but explicit.
 
 When your process receives a C<SIGHUP>, this module will check for the
 existence of a configuration file (C</tmp/devel-probe-config.cfg> by default).
