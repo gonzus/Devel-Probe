@@ -18,19 +18,21 @@ static int probe_lookup(const char* file, int line, int create)
     U32 klen = strlen(file);
     SV** rlines = hv_fetch(probe_hash, file, klen, 0);
     HV* lines = 0;
+    char kstr[20];
+
     if (rlines) {
         lines = (HV*) SvRV(*rlines);
         // fprintf(stderr, "PROBE found entry for file [%s]: %p\n", file, lines);
     } else if (!create) {
         return 0;
     } else {
+        SV* slines = 0;
         lines = newHV();
-        SV* slines = (SV*) newRV((SV*) lines);
+        slines = (SV*) newRV((SV*) lines);
         hv_store(probe_hash, file, klen, slines, 0);
         // fprintf(stderr, "PROBE created entry for file [%s]: %p\n", file, lines);
     }
 
-    char kstr[20];
     klen = sprintf(kstr, "%d", line);
     if (!create) {
         SV** rflag = hv_fetch(lines, kstr, klen, 0);
@@ -52,6 +54,7 @@ static void probe_dump(void)
         SV* value = 0;
         char* kstr = 0;
         STRLEN klen = 0;
+        HV* lines = 0;
         HE* entry = hv_iternext(probe_hash);
         if (!entry) {
             break; /* no more hash keys */
@@ -70,7 +73,7 @@ static void probe_dump(void)
         if (!value) {
             continue; /* invalid value */
         }
-        HV* lines = (HV*) SvRV(value);
+        lines = (HV*) SvRV(value);
         hv_iterinit(lines);
         while (1) {
             SV* key = 0;
@@ -114,12 +117,15 @@ static OP* probe_nextstate(pTHX)
     OP* ret = nextstate_orig(aTHX);
 
     do {
+        const char* file = 0;
+        int line = 0;
+
         if (!probe_enabled) {
             break;
         }
 
-        const char* file = CopFILE(PL_curcop);
-        int line = CopLINE(PL_curcop);
+        file = CopFILE(PL_curcop);
+        line = CopLINE(PL_curcop);
         if (!probe_lookup(file, line, 0)) {
             break;
         }
@@ -158,12 +164,15 @@ static void probe_check(pTHX_ const char* signal)
 
         while (1) {
             char buf[1024];
+            int ini = 0;
+            int pos = 0;
+
             if (!fgets(buf, 1024, fp)) {
                 break;
             }
 
-            int ini = 0;
-            int pos = skip_chars(buf, ini, 1);
+            ini = 0;
+            pos = skip_chars(buf, ini, 1);
             if (buf[pos] == '\0') {
                 continue;
             }
@@ -194,6 +203,8 @@ static void probe_check(pTHX_ const char* signal)
                 continue;
             }
             if (memcmp(buf + ini, "probe", pos - ini) == 0) {
+                char file[1024];
+
                 ini = pos;
                 pos = skip_chars(buf, ini, 1);
                 if (buf[pos] == '\0') {
@@ -204,12 +215,14 @@ static void probe_check(pTHX_ const char* signal)
                 }
                 ini = pos;
                 pos = skip_chars(buf, ini, 0);
-                char file[1024];
                 memcpy(file, buf + ini, pos - ini);
                 file[pos - ini] = '\0';
                 fprintf(stderr, "PROBE file [%s]\n", file);
 
                 while (1) {
+                    int j = 0;
+                    int line = 0;
+
                     ini = pos;
                     pos = skip_chars(buf, ini, 1);
                     if (buf[pos] == '\0') {
@@ -220,8 +233,8 @@ static void probe_check(pTHX_ const char* signal)
                     }
                     ini = pos;
                     pos = skip_chars(buf, ini, 0);
-                    int line = 0;
-                    for (int j = ini; j < pos; ++j) {
+                    line = 0;
+                    for (j = ini; j < pos; ++j) {
                         line = line * 10 + buf[j] - '0';
                     }
                     fprintf(stderr, "PROBE line [%d]\n", line);
@@ -246,11 +259,12 @@ PROTOTYPES: DISABLE
 void
 install(HV* options)
 PREINIT:
+    SV** opt_check = 0;
 CODE:
     probe_install(aTHX);
     probe_hash = newHV();
 
-    SV** opt_check = hv_fetch(options, "check", 5, 0);
+    opt_check = hv_fetch(options, "check", 5, 0);
     if (opt_check && SvTRUE(*opt_check)) {
         probe_check(aTHX_ "_INIT_");
     }
