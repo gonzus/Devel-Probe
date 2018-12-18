@@ -1,2 +1,2 @@
-# devel-quickcover
-Quick &amp; dirty code coverage for Perl
+# Devel-Probe
+Quick & dirty probes for Perl

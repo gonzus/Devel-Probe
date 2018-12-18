@@ -24,8 +24,8 @@ WriteMakefile(
         resources   => {
             repository => {
                 type => 'git',
-                url  => 'git@github.com:gonzus/Geo-OLC-XS',
-                web  => 'https://github.com/gonzus/Geo-OLC-XS',
+                url  => 'git@github.com:gonzus/Devel-Probe.git',
+                web  => 'https://github.com/gonzus/Devel-Probe.git',
             },
         },
     },
