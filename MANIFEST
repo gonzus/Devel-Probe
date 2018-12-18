@@ -5,6 +5,7 @@ lib/Devel/Probe.pm
 
 t/000-use.t
 t/001-simple.t
+t/002-signal.t
 
 Changes
 LICENSE

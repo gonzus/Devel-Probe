@@ -13,8 +13,10 @@ sub import {
 
     croak('Invalid argument to import, it takes key-value pairs. FOO => BAR')
         if 1 == @opts % 2;
-    my %options = @opts;
 
+    $SIG{'HUP'} = \&Devel::Probe::check;
+
+    my %options = @opts;
     Devel::Probe::install(\%options);
 }
 
