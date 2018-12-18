@@ -2,8 +2,8 @@ use strict;
 use warnings;
 
 use Test::More;
-# use Devel::Probe (check => 1);
-use Devel::Probe;
+use Devel::Probe (check => 1);
+# use Devel::Probe;
 
 exit main();
 

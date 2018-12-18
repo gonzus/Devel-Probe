@@ -248,6 +248,7 @@ install(HV* options)
 PREINIT:
 CODE:
     probe_install(aTHX);
+    probe_hash = newHV();
 
     SV** opt_check = hv_fetch(options, "check", 5, 0);
     if (opt_check && SvTRUE(*opt_check)) {
