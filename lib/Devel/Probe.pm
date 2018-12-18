@@ -44,6 +44,11 @@ Version 0.000001
     use Devel::Probe (check => 1);
     ...
 
+    Devel::Probe::trigger(sub {
+        my ($file, $line) = @_;
+        # probe logic
+    });
+
 =head1 DESCRIPTION
 
 Use this module to allow the possibility of creating probes for some lines in
@@ -87,13 +92,35 @@ Add a probe for the given file in each of the given lines.
 
 =back
 
+=head1 EXAMPLE
+
+This will invoke the C<trigger> callback whenever line 14 executes, and use
+C<PadWalker> to dump the local variables.
+
+    # in my_cool_script.pl
+    use Data::Dumper qw(Dumper);
+    use PadWalker qw(peek_my);
+    use Devel::Probe (check => 1);
+
+    Devel::Probe::trigger(sub {
+        my ($file, $line) = @_;
+        say Dumper(peek_my(1)); # 1 to jump up one level in the stack;
+    });
+
+    my $count;
+    while (1) {
+        $count++;
+        my $something_inside_the_loop = $count * 2;
+        sleep 5;
+    }
+
+    # /tmp/devel-probe-config.cfg
+    enable
+    probe my_cool_script.pl 13
+
 =head1 TODO
 
 =over 4
-
-=item
-
-For now, a probe will simply print a line to C<stderr>.
 
 =item
 
