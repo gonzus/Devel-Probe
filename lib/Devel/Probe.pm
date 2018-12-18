@@ -89,7 +89,20 @@ Add a probe for the given file in each of the given lines.
 
 =head1 TODO
 
+=over 4
+
+=item
+
 For now, a probe will simply print a line to C<stderr>.
+
+=item
+
+Probes are stored in a hash of file names; per file name, there is a hash
+of line numbers (with 1 or 0 as a value).  It is likely this can be made more
+performant with a better data structure, but that needs profiling.
+
+=back
+
 
 =head1 AUTHORS
 
