@@ -16,8 +16,11 @@ XSLoader::load( 'Devel::Probe', $VERSION );
 my %known_options = map +( $_ => 1 ), qw/
     signal_name
     skip_install
+    config_file
     check_config_file
 /;
+
+my $config_file = PROBE_CONFIG_NAME;
 
 sub import {
     my ($class, @opts) = @_;
@@ -27,6 +30,9 @@ sub import {
         die "Unrecognized option $option" unless exists $known_options{$option};
     }
 
+    if ($options{config_file}) {
+        $config_file = $options{config_file};
+    }
     my $signal_name = $options{signal_name} // PROBE_SIGNAL_NAME;
     $SIG{$signal_name} = \&Devel::Probe::check_config_file;
 
@@ -42,7 +48,7 @@ sub check_config_file {
     printf STDERR ("PROBE check %s %s\n", $signal_name, time());
     Devel::Probe::disable();
     while (1) {
-        my $path = Path::Tiny::path(PROBE_CONFIG_NAME);
+        my $path = Path::Tiny::path($config_file);
         last unless $path && $path->is_file();
 
         my @lines = $path->lines();
