@@ -15,11 +15,13 @@ XSLoader::load( 'Devel::Probe', $VERSION );
 sub import {
     my ($class, @opts) = @_;
 
-    $SIG{'HUP'} = \&Devel::Probe::check_config_file;
-    Devel::Probe::install();
-
     my %options = @opts;
-    check_config_file("_IMPORT_") if $options{check};
+    $SIG{'HUP'} = \&Devel::Probe::check_config_file;
+
+    if (!$options{skip_install}) {
+        Devel::Probe::install();
+        check_config_file("_IMPORT_") if $options{check_config_file};
+    }
 }
 
 sub check_config_file {
@@ -91,9 +93,13 @@ Version 0.000002
 
     use Devel::Probe;
     # or
-    use Devel::Probe (check => 0);
+    use Devel::Probe (check_config_file => 0);
     # or
-    use Devel::Probe (check => 1);
+    use Devel::Probe (check_config_file => 1);
+    # or
+    use Devel::Probe (skip_install => 0);
+    # or
+    use Devel::Probe (skip_install => 1);
     ...
 
     Devel::Probe::trigger(sub {
@@ -106,17 +112,20 @@ Version 0.000002
 Use this module to allow the possibility of creating probes for some lines in
 your code.
 
-By default the probing is disabled, but if you import the module with C<check
-=E<gt> 1>, it will immediately check for a configuration file, as when reacting
-to C<SIGHUP> (see below).  Using C<check =E<gt> 0> is equivalent to the
-default, but explicit.
+By default the probing code is installed when you import the module, but if you
+import it with C<skip_install =E<gt> 1> the code is not installed at all
+(useful for benchmarking the impact of loading the module with no active
+probes).
+
+By default the probing is disabled, but if you import the module with
+C<check_config_file =E<gt> 1>, it will immediately check for a configuration
+file, as when reacting to C<SIGHUP> (see below).
 
 When your process receives a C<SIGHUP>, this module will check for the
 existence of a configuration file (C</tmp/devel-probe-config.cfg> by default).
-If that file exists, it must contain a list of directives for the probing.
-Therefore, if the configuration file enables probing, after sending C<SIGHUP>
-to the process it will act as if you had used the module with C<check =E<gt>
-1>.
+If that file exists, it must contain a list of directives for the probing.  If
+the configuration file enables probing, after sending C<SIGHUP> to the process
+it will start checking for probes.
 
 The directives allowed in the configuration file are:
 
@@ -152,7 +161,7 @@ C<PadWalker> to dump the local variables.
     # in my_cool_script.pl
     use Data::Dumper qw(Dumper);
     use PadWalker qw(peek_my);
-    use Devel::Probe (check => 1);
+    use Devel::Probe (check_config_file => 1);
 
     Devel::Probe::trigger(sub {
         my ($file, $line) = @_;

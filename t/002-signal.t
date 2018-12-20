@@ -2,7 +2,7 @@ use strict;
 use warnings;
 
 use Test::More;
-use Devel::Probe (check => 1);
+use Devel::Probe (check_config_file => 1);
 # use Devel::Probe;
 
 exit main();

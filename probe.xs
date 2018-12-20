@@ -5,6 +5,7 @@
 #include "ppport.h"
 
 static Perl_ppaddr_t probe_nextstate_orig = 0;
+static int probe_installed = 0;
 static int probe_enabled = 0;
 static HV* probe_hash = 0;
 static SV* probe_trigger_cb = 0;
@@ -161,7 +162,7 @@ static void probe_dump(void)
 
 static int probe_is_enabled(void)
 {
-    return !!probe_enabled;
+    return probe_enabled;
 }
 
 static void probe_enable(void)
@@ -173,9 +174,9 @@ static void probe_enable(void)
     probe_enabled = 1;
 }
 
-static void probe_reset(void)
+static void probe_reset(int installed)
 {
-    probe_nextstate_orig = 0;
+    probe_installed = installed;
     probe_enabled = 0;
     probe_hash = 0;
     probe_trigger_cb = 0;
@@ -198,7 +199,7 @@ static void probe_disable(void)
 
 static int probe_is_installed(void)
 {
-    return !!probe_nextstate_orig;
+    return probe_installed;
 }
 
 static void probe_install(void)
@@ -207,9 +208,13 @@ static void probe_install(void)
         return;
     }
 
-    probe_nextstate_orig = PL_ppaddr[OP_NEXTSTATE];
+    fprintf(stderr, "PROBE installed, [%p] => [%p]\n", PL_ppaddr[OP_NEXTSTATE], probe_nextstate);
+
+    if (!probe_nextstate_orig) {
+        probe_nextstate_orig = PL_ppaddr[OP_NEXTSTATE];
+    }
     PL_ppaddr[OP_NEXTSTATE] = probe_nextstate;
-    fprintf(stderr, "PROBE installed, orig is [%p]\n", probe_nextstate_orig);
+    probe_reset(1);
     probe_clear();
 }
 
@@ -218,9 +223,11 @@ static void probe_remove(void)
     if (!probe_is_installed()) {
         return;
     }
-    PL_ppaddr[OP_NEXTSTATE] = probe_nextstate_orig;
-    probe_reset();
-    fprintf(stderr, "PROBE removed\n");
+    fprintf(stderr, "PROBE removed, [%p] => [%p]\n", PL_ppaddr[OP_NEXTSTATE], probe_nextstate_orig);
+    if (probe_nextstate_orig) {
+        PL_ppaddr[OP_NEXTSTATE] = probe_nextstate_orig;
+    }
+    probe_reset(0);
 }
 
 MODULE = Devel::Probe        PACKAGE = Devel::Probe
@@ -238,6 +245,12 @@ remove()
 CODE:
     probe_remove();
 
+int
+is_installed()
+CODE:
+    RETVAL = probe_is_installed();
+OUTPUT: RETVAL
+
 void
 enable()
 CODE:
@@ -247,6 +260,12 @@ void
 disable()
 CODE:
     probe_disable();
+
+int
+is_enabled()
+CODE:
+    RETVAL = probe_is_enabled();
+OUTPUT: RETVAL
 
 void
 clear()
