@@ -6,6 +6,8 @@ lib/Devel/Probe.pm
 t/000-use.t
 t/001-simple.t
 t/002-signal.t
+t/002-signal-usr1.t
+t/003-config.t
 t/004-status-installed.t
 t/004-status-not-installed.t
 t/005-status-enabled.t
