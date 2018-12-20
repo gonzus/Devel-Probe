@@ -13,6 +13,30 @@ static HV* probe_hash = 0;
 static void probe_install(pTHX);
 static OP*  probe_nextstate(pTHX);
 
+static SV* trigger_cb = (SV*)NULL;
+
+static inline void invoke_callback(const char* file, int line, SV* callback)
+{
+    int count;
+
+    dSP;
+
+    ENTER; SAVETMPS;
+    PUSHMARK (SP);
+    EXTEND(SP, 2);
+    XPUSHs(sv_2mortal(newSVpv(file, 0)));
+    XPUSHs(sv_2mortal(newSViv(line)));
+
+    PUTBACK;
+    count = call_sv (callback, G_VOID|G_DISCARD);
+    if (count != 0) {
+        croak("probe trigger should have zero return values");
+    }
+
+    FREETMPS; LEAVE;
+}
+
+
 static int probe_lookup(const char* file, int line, int create)
 {
     U32 klen = strlen(file);
@@ -126,12 +150,15 @@ static OP* probe_nextstate(pTHX)
 
         file = CopFILE(PL_curcop);
         line = CopLINE(PL_curcop);
+        // it isn't always obvious what file path is being used (e.g., what you should put in the cfg file)
+        // fprintf(stderr, "file %s and line %d\n", file, line);
         if (!probe_lookup(file, line, 0)) {
             break;
         }
 
-        /* do our own nefarious thing... */
-        fprintf(stderr, "PROBE TRIGGERED [%s] [%d]\n", file, line);
+        if (trigger_cb != (SV*)NULL) {
+            invoke_callback(file, line, trigger_cb);
+        }
     } while (0);
 
     return ret;
@@ -274,3 +301,12 @@ check(const char* signal)
 PREINIT:
 CODE:
     probe_check(aTHX_ signal);
+
+void
+trigger(SV* callback)
+CODE:
+    if (trigger_cb == (SV*)NULL) {
+        trigger_cb = newSVsv(callback);
+    } else {
+        SvSetSV(trigger_cb, callback);
+    }
