@@ -7,16 +7,28 @@ use Path::Tiny;
 
 use constant {
     PROBE_CONFIG_NAME  => '/tmp/devel-probe-config.cfg',
+    PROBE_SIGNAL_NAME  => 'HUP',
 };
 
 our $VERSION = '0.000002';
 XSLoader::load( 'Devel::Probe', $VERSION );
 
+my %known_options = map +( $_ => 1 ), qw/
+    signal_name
+    skip_install
+    check_config_file
+/;
+
 sub import {
     my ($class, @opts) = @_;
 
     my %options = @opts;
-    $SIG{'HUP'} = \&Devel::Probe::check_config_file;
+    foreach my $option (keys %options) {
+        die "Unrecognized option $option" unless exists $known_options{$option};
+    }
+
+    my $signal_name = $options{signal_name} // PROBE_SIGNAL_NAME;
+    $SIG{$signal_name} = \&Devel::Probe::check_config_file;
 
     if (!$options{skip_install}) {
         Devel::Probe::install();
@@ -119,13 +131,14 @@ probes).
 
 By default the probing is disabled, but if you import the module with
 C<check_config_file =E<gt> 1>, it will immediately check for a configuration
-file, as when reacting to C<SIGHUP> (see below).
+file, as when reacting to a signal (see below).
 
-When your process receives a C<SIGHUP>, this module will check for the
-existence of a configuration file (C</tmp/devel-probe-config.cfg> by default).
-If that file exists, it must contain a list of directives for the probing.  If
-the configuration file enables probing, after sending C<SIGHUP> to the process
-it will start checking for probes.
+When your process receives a  specific signal (C<SIGHUP> by default), this
+module will check for the existence of a configuration file
+(C</tmp/devel-probe-config.cfg> by default).  If that file exists, it must
+contain a list of directives for the probing.  If the configuration file
+enables probing, after sending a signal to the process it will start checking
+for probes.
 
 The directives allowed in the configuration file are:
 
