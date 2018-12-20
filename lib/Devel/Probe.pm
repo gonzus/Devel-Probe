@@ -137,12 +137,6 @@ performant with a better data structure, but that needs profiling.
 
 =item * Gonzalo Diethelm C<< gonzus AT cpan DOT org >>
 
-=back
-
-=head1 THANKS
-
-=over 4
-
-=item * Ben Tyler for the inspiration
+=item * Ben Tyler C<< btyler AT cpan DOT org >>
 
 =back
