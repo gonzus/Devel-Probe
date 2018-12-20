@@ -4,38 +4,41 @@
 #include "XSUB.h"
 #include "ppport.h"
 
-#define PROBE_CONFIG "/tmp/devel-probe-config.cfg"
-
-static Perl_ppaddr_t nextstate_orig = 0;
+static Perl_ppaddr_t probe_nextstate_orig = 0;
 static int probe_enabled = 0;
 static HV* probe_hash = 0;
+static SV* probe_trigger_cb = 0;
 
-static void probe_install(pTHX);
-static OP*  probe_nextstate(pTHX);
+static int probe_is_enabled(void);
+static void probe_enable(void);
+static void probe_disable(void);
+static int probe_is_installed(void);
+static void probe_install(void);
+static void probe_remove(void);
 
-static SV* trigger_cb = (SV*)NULL;
-
-static inline void invoke_callback(const char* file, int line, SV* callback)
+static inline void probe_invoke_callback(const char* file, int line, SV* callback)
 {
     int count;
 
     dSP;
 
-    ENTER; SAVETMPS;
+    ENTER;
+    SAVETMPS;
+
     PUSHMARK (SP);
     EXTEND(SP, 2);
     XPUSHs(sv_2mortal(newSVpv(file, 0)));
     XPUSHs(sv_2mortal(newSViv(line)));
-
     PUTBACK;
-    count = call_sv (callback, G_VOID|G_DISCARD);
+
+    count = call_sv(callback, G_VOID|G_DISCARD);
     if (count != 0) {
         croak("probe trigger should have zero return values");
     }
 
-    FREETMPS; LEAVE;
+    FREETMPS;
+    LEAVE;
 }
-
 
 static int probe_lookup(const char* file, int line, int create)
 {
@@ -68,6 +71,37 @@ static int probe_lookup(const char* file, int line, int create)
     }
 
     return 1;
+}
+
+static OP* probe_nextstate(pTHX)
+{
+    OP* ret = probe_nextstate_orig(aTHX);
+
+    do {
+        const char* file = 0;
+        int line = 0;
+
+        if (!probe_is_enabled()) {
+            break;
+        }
+
+        file = CopFILE(PL_curcop);
+        line = CopLINE(PL_curcop);
+        // it isn't always obvious what file path is being used (e.g., what you should put in the cfg file)
+        // fprintf(stderr, "file %s and line %d\n", file, line);
+        if (!probe_lookup(file, line, 0)) {
+            break;
+        }
+
+        fprintf(stderr, "PROBE triggered [%s] [%d]\n", file, line);
+        if (!probe_trigger_cb) {
+            break;
+        }
+
+        probe_invoke_callback(file, line, probe_trigger_cb);
+    } while (0);
+
+    return ret;
 }
 
 static void probe_dump(void)
@@ -125,157 +159,68 @@ static void probe_dump(void)
     }
 }
 
-static void probe_install(pTHX)
+static int probe_is_enabled(void)
 {
-    if (PL_ppaddr[OP_NEXTSTATE] == probe_nextstate) {
-        croak("probe_install called twice");
+    return !!probe_enabled;
+}
+
+static void probe_enable(void)
+{
+    if (probe_is_enabled()) {
+        return;
     }
-
-    nextstate_orig = PL_ppaddr[OP_NEXTSTATE];
-    PL_ppaddr[OP_NEXTSTATE] = probe_nextstate;
-    // fprintf(stderr, "PROBE nextstate_orig is [%p]\n", nextstate_orig);
+    fprintf(stderr, "PROBE enabling\n");
+    probe_enabled = 1;
 }
 
-static OP* probe_nextstate(pTHX)
+static void probe_reset(void)
 {
-    OP* ret = nextstate_orig(aTHX);
-
-    do {
-        const char* file = 0;
-        int line = 0;
-
-        if (!probe_enabled) {
-            break;
-        }
-
-        file = CopFILE(PL_curcop);
-        line = CopLINE(PL_curcop);
-        // it isn't always obvious what file path is being used (e.g., what you should put in the cfg file)
-        // fprintf(stderr, "file %s and line %d\n", file, line);
-        if (!probe_lookup(file, line, 0)) {
-            break;
-        }
-
-        if (trigger_cb != (SV*)NULL) {
-            invoke_callback(file, line, trigger_cb);
-        }
-    } while (0);
-
-    return ret;
-}
-
-static int skip_chars(const char* buf, int pos, int ws)
-{
-    while (!!isspace(buf[pos]) == !!ws) {
-        if (buf[pos] == '#') {
-            break;
-        }
-        ++pos;
-    }
-    return pos;
-}
-
-static void probe_check(pTHX_ const char* signal)
-{
-    FILE* fp = 0;
-
-    time_t now = time(0);
-    struct tm* tm = localtime(&now);
-    fprintf(stderr, "PROBE check %s %04d-%02d-%02d %02d:%02d:%02d\n", signal, tm->tm_year + 1900, tm->tm_mon + 1, tm->tm_mday, tm->tm_hour, tm->tm_min, tm->tm_sec);
+    probe_nextstate_orig = 0;
     probe_enabled = 0;
-    do {
-        fp = fopen(PROBE_CONFIG, "r");
-        if (!fp) {
-            break;
-        }
+    probe_hash = 0;
+    probe_trigger_cb = 0;
+}
 
-        while (1) {
-            char buf[1024];
-            int ini = 0;
-            int pos = 0;
+static void probe_clear(void)
+{
+    probe_hash = newHV();
+    fprintf(stderr, "PROBE cleared\n");
+}
 
-            if (!fgets(buf, 1024, fp)) {
-                break;
-            }
-
-            ini = 0;
-            pos = skip_chars(buf, ini, 1);
-            if (buf[pos] == '\0') {
-                continue;
-            }
-            if (buf[pos] == '#') {
-                continue;
-            }
-            ini = pos;
-            pos = skip_chars(buf, ini, 0);
-            // fprintf(stderr, "[%*.*s]\n", pos - ini, pos - ini, buf + ini);
-            if (memcmp(buf + ini, "enable", pos - ini) == 0) {
-                fprintf(stderr, "PROBE enable\n");
-                probe_enabled = 1;
-                continue;
-            }
-            if (memcmp(buf + ini, "disable", pos - ini) == 0) {
-                fprintf(stderr, "PROBE disable\n");
-                probe_enabled = 0;
-                continue;
-            }
-            if (memcmp(buf + ini, "dump", pos - ini) == 0) {
-                fprintf(stderr, "PROBE dump\n");
-                probe_dump();
-                continue;
-            }
-            if (memcmp(buf + ini, "clear", pos - ini) == 0) {
-                fprintf(stderr, "PROBE clear\n");
-                probe_hash = newHV();
-                continue;
-            }
-            if (memcmp(buf + ini, "probe", pos - ini) == 0) {
-                char file[1024];
-
-                ini = pos;
-                pos = skip_chars(buf, ini, 1);
-                if (buf[pos] == '\0') {
-                    continue;
-                }
-                if (buf[pos] == '#') {
-                    continue;
-                }
-                ini = pos;
-                pos = skip_chars(buf, ini, 0);
-                memcpy(file, buf + ini, pos - ini);
-                file[pos - ini] = '\0';
-                fprintf(stderr, "PROBE file [%s]\n", file);
-
-                while (1) {
-                    int j = 0;
-                    int line = 0;
-
-                    ini = pos;
-                    pos = skip_chars(buf, ini, 1);
-                    if (buf[pos] == '\0') {
-                        break;
-                    }
-                    if (buf[pos] == '#') {
-                        break;
-                    }
-                    ini = pos;
-                    pos = skip_chars(buf, ini, 0);
-                    line = 0;
-                    for (j = ini; j < pos; ++j) {
-                        line = line * 10 + buf[j] - '0';
-                    }
-                    fprintf(stderr, "PROBE line [%d]\n", line);
-                    probe_lookup(file, line, 1);
-                }
-                continue;
-            }
-        }
-    } while (0);
-
-    if (fp) {
-        fclose(fp);
-        fp = 0;
+static void probe_disable(void)
+{
+    if (!probe_is_enabled()) {
+        return;
     }
+    probe_enabled = 0;
+    fprintf(stderr, "PROBE disabled\n");
+}
+
+static int probe_is_installed(void)
+{
+    return !!probe_nextstate_orig;
+}
+
+static void probe_install(void)
+{
+    if (probe_is_installed()) {
+        return;
+    }
+
+    probe_nextstate_orig = PL_ppaddr[OP_NEXTSTATE];
+    PL_ppaddr[OP_NEXTSTATE] = probe_nextstate;
+    fprintf(stderr, "PROBE installed, orig is [%p]\n", probe_nextstate_orig);
+    probe_clear();
+}
+
+static void probe_remove(void)
+{
+    if (!probe_is_installed()) {
+        return;
+    }
+    PL_ppaddr[OP_NEXTSTATE] = probe_nextstate_orig;
+    probe_reset();
+    fprintf(stderr, "PROBE removed\n");
 }
 
 MODULE = Devel::Probe        PACKAGE = Devel::Probe
@@ -284,29 +229,45 @@ PROTOTYPES: DISABLE
 #################################################################
 
 void
-install(HV* options)
-PREINIT:
-    SV** opt_check = 0;
+install()
 CODE:
-    probe_install(aTHX);
-    probe_hash = newHV();
-
-    opt_check = hv_fetch(options, "check", 5, 0);
-    if (opt_check && SvTRUE(*opt_check)) {
-        probe_check(aTHX_ "_INIT_");
-    }
+    probe_install();
 
 void
-check(const char* signal)
-PREINIT:
+remove()
 CODE:
-    probe_check(aTHX_ signal);
+    probe_remove();
+
+void
+enable()
+CODE:
+    probe_enable();
+
+void
+disable()
+CODE:
+    probe_disable();
+
+void
+clear()
+CODE:
+    probe_clear();
+
+void
+dump()
+CODE:
+    probe_dump();
+
+void
+add_probe(const char* file, int line)
+CODE:
+    probe_lookup(file, line, 1);
 
 void
 trigger(SV* callback)
 CODE:
-    if (trigger_cb == (SV*)NULL) {
-        trigger_cb = newSVsv(callback);
+    if (probe_trigger_cb == (SV*)NULL) {
+        probe_trigger_cb = newSVsv(callback);
     } else {
-        SvSetSV(trigger_cb, callback);
+        SvSetSV(probe_trigger_cb, callback);
     }

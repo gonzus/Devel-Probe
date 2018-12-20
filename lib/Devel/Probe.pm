@@ -3,22 +3,74 @@ use strict;
 use warnings;
 
 use XSLoader;
+use Path::Tiny;
 
-our $VERSION = '0.000001';
+use constant {
+    PROBE_CONFIG_NAME  => '/tmp/devel-probe-config.cfg',
+};
 
+our $VERSION = '0.000002';
 XSLoader::load( 'Devel::Probe', $VERSION );
 
 sub import {
     my ($class, @opts) = @_;
 
-    croak('Invalid argument to import, it takes key-value pairs. FOO => BAR')
-        if 1 == @opts % 2;
-
-    $SIG{'HUP'} = \&Devel::Probe::check;
+    $SIG{'HUP'} = \&Devel::Probe::check_config_file;
+    Devel::Probe::install();
 
     my %options = @opts;
-    Devel::Probe::install(\%options);
+    check_config_file("_IMPORT_") if $options{check};
 }
+
+sub check_config_file {
+    my ($signal_name) = @_;
+
+    printf STDERR ("PROBE check %s %s\n", $signal_name, time());
+    Devel::Probe::disable();
+    while (1) {
+        my $path = Path::Tiny::path(PROBE_CONFIG_NAME);
+        last unless $path && $path->is_file();
+
+        my @lines = $path->lines();
+        foreach my $line (@lines) {
+            next if $line =~ m/^\s*[#]?\s*$/;
+            my @fields = split(' ', $line);
+            next unless @fields;
+            my $op = shift @fields;
+            if ($op eq 'enable') {
+                Devel::Probe::enable();
+                next;
+            }
+            if ($op eq 'disable') {
+                Devel::Probe::disable();
+                next;
+            }
+            if ($op eq 'dump') {
+                Devel::Probe::dump();
+                next;
+            }
+            if ($op eq 'clear') {
+                Devel::Probe::clear();
+                next;
+            }
+            if ($op eq 'probe') {
+                next unless @fields;
+
+                my $file = shift @fields;
+                printf STDERR ("PROBE file [%s]\n", $file);
+
+                next unless @fields;
+                foreach my $line (@fields) {
+                    printf STDERR ("PROBE line [%d]\n", $line);
+                    Devel::Probe::add_probe($file, $line);
+                }
+                next;
+            }
+        }
+        last;
+    }
+}
+
 
 1;
 __END__
@@ -33,7 +85,7 @@ Devel::Probe - Quick & dirty code probes for Perl
 
 =head1 VERSION
 
-Version 0.000001
+Version 0.000002
 
 =head1 SYNOPSIS
 
