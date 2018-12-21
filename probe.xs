@@ -17,6 +17,19 @@ static int probe_is_installed(void);
 static void probe_install(void);
 static void probe_remove(void);
 
+#define DEBUG 0
+
+#define INFO(x) do { if (DEBUG > 0) dbg_printf x; } while (0)
+#define TRACE(x) do { if (DEBUG > 1) dbg_printf x; } while (0)
+
+void dbg_printf(const char *fmt, ...)
+{
+    va_list args;
+    va_start(args, fmt);
+    vfprintf(stderr, fmt, args);
+    va_end(args);
+}
+
 static inline void probe_invoke_callback(const char* file, int line, SV* callback)
 {
     int count;
@@ -50,7 +63,7 @@ static int probe_lookup(const char* file, int line, int create)
 
     if (rlines) {
         lines = (HV*) SvRV(*rlines);
-        // fprintf(stderr, "PROBE found entry for file [%s]: %p\n", file, lines);
+        TRACE(("PROBE found entry for file [%s]: %p\n", file, lines));
     } else if (!create) {
         return 0;
     } else {
@@ -58,7 +71,7 @@ static int probe_lookup(const char* file, int line, int create)
         lines = newHV();
         slines = (SV*) newRV((SV*) lines);
         hv_store(probe_hash, file, klen, slines, 0);
-        // fprintf(stderr, "PROBE created entry for file [%s]: %p\n", file, lines);
+        TRACE(("PROBE created entry for file [%s]: %p\n", file, lines));
     }
 
     klen = sprintf(kstr, "%d", line);
@@ -68,7 +81,7 @@ static int probe_lookup(const char* file, int line, int create)
     } else {
         SV* flag = &PL_sv_yes;
         hv_store(lines, kstr, klen, flag, 0);
-        // fprintf(stderr, "PROBE created entry for line [%s]\n", kstr);
+        TRACE(("PROBE created entry for line [%s]\n", kstr));
     }
 
     return 1;
@@ -89,12 +102,12 @@ static OP* probe_nextstate(pTHX)
         file = CopFILE(PL_curcop);
         line = CopLINE(PL_curcop);
         // it isn't always obvious what file path is being used (e.g., what you should put in the cfg file)
-        // fprintf(stderr, "file %s and line %d\n", file, line);
+        TRACE(("PROBE check [%s] [%d]\n", file, line));
         if (!probe_lookup(file, line, 0)) {
             break;
         }
 
-        fprintf(stderr, "PROBE triggered [%s] [%d]\n", file, line);
+        INFO(("PROBE triggered [%s] [%d]\n", file, line));
         if (!probe_trigger_cb) {
             break;
         }
@@ -170,7 +183,7 @@ static void probe_enable(void)
     if (probe_is_enabled()) {
         return;
     }
-    fprintf(stderr, "PROBE enabling\n");
+    INFO(("PROBE enabling\n"));
     probe_enabled = 1;
 }
 
@@ -185,7 +198,7 @@ static void probe_reset(int installed)
 static void probe_clear(void)
 {
     probe_hash = newHV();
-    fprintf(stderr, "PROBE cleared\n");
+    INFO(("PROBE cleared\n"));
 }
 
 static void probe_disable(void)
@@ -194,7 +207,7 @@ static void probe_disable(void)
         return;
     }
     probe_enabled = 0;
-    fprintf(stderr, "PROBE disabled\n");
+    INFO(("PROBE disabled\n"));
 }
 
 static int probe_is_installed(void)
@@ -208,7 +221,7 @@ static void probe_install(void)
         return;
     }
 
-    fprintf(stderr, "PROBE installed, [%p] => [%p]\n", PL_ppaddr[OP_NEXTSTATE], probe_nextstate);
+    INFO(("PROBE installed, [%p] => [%p]\n", PL_ppaddr[OP_NEXTSTATE], probe_nextstate));
 
     if (!probe_nextstate_orig) {
         probe_nextstate_orig = PL_ppaddr[OP_NEXTSTATE];
@@ -223,7 +236,7 @@ static void probe_remove(void)
     if (!probe_is_installed()) {
         return;
     }
-    fprintf(stderr, "PROBE removed, [%p] => [%p]\n", PL_ppaddr[OP_NEXTSTATE], probe_nextstate_orig);
+    INFO(("PROBE removed, [%p] => [%p]\n", PL_ppaddr[OP_NEXTSTATE], probe_nextstate_orig));
     if (probe_nextstate_orig) {
         PL_ppaddr[OP_NEXTSTATE] = probe_nextstate_orig;
     }
