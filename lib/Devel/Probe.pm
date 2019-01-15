@@ -21,7 +21,8 @@ my %known_options = map +( $_ => 1 ), qw/
     check_config_file
 /;
 
-my $config_file = PROBE_CONFIG_NAME;
+my $config_file;
+my $signal_name;
 
 sub import {
     my ($class, @opts) = @_;
@@ -31,22 +32,33 @@ sub import {
         die "Unrecognized option $option" unless exists $known_options{$option};
     }
 
-    if ($options{config_file}) {
-        $config_file = $options{config_file};
-    }
-    my $signal_name = $options{signal_name} // PROBE_SIGNAL_NAME;
-    $SIG{$signal_name} = \&Devel::Probe::check_config_file;
+    set_config_name($options{config_file});
+    set_signal_name($options{signal_name});
 
-    if (!$options{skip_install}) {
-        Devel::Probe::install();
-        check_config_file("_IMPORT_") if $options{check_config_file};
-    }
+    return if $options{skip_install};
+    Devel::Probe::install();
+
+    return unless $options{check_config_file};
+    check_config_file("import");
+}
+
+sub set_config_name {
+    my ($name) = @_;
+
+    $config_file = $name // PROBE_CONFIG_NAME;
+}
+
+sub set_signal_name {
+    my ($name) = @_;
+
+    $signal_name = $name // PROBE_SIGNAL_NAME;
+    $SIG{$signal_name} = \&Devel::Probe::check_config_file;
 }
 
 sub check_config_file {
-    my ($signal_name) = @_;
+    my ($reason) = @_;
 
-    printf STDERR ("PROBE check %s %s\n", $signal_name, time());
+    $reason //= 'manual';
     Devel::Probe::disable();
 
     my $path = Path::Tiny::path($config_file);
@@ -58,31 +70,25 @@ sub check_config_file {
 
     foreach my $action (@{ $data->{actions} }) {
         if ($action->{action} eq 'enable') {
-            printf STDERR ("JSON enable\n");
             Devel::Probe::enable();
             next;
         }
         if ($action->{action} eq 'disable') {
-            printf STDERR ("JSON disable\n");
             Devel::Probe::disable();
             next;
         }
         if ($action->{action} eq 'dump') {
-            printf STDERR ("JSON dump\n");
             Devel::Probe::dump();
             next;
         }
         if ($action->{action} eq 'clear') {
-            printf STDERR ("JSON clear\n");
             Devel::Probe::clear();
             next;
         }
         if ($action->{action} eq 'define') {
             my $file = $action->{file};
             next unless $file;
-            printf STDERR ("JSON file [%s]\n", $file);
             foreach my $line (@{ $action->{lines} // [] }) {
-                printf STDERR ("JSON line [%d]\n", $line);
                 Devel::Probe::add_probe($file, $line);
             }
             next;
