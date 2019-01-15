@@ -3,10 +3,11 @@ use strict;
 use warnings;
 
 use XSLoader;
-use Path::Tiny;
+use Path::Tiny ();
+use JSON::XS   ();
 
 use constant {
-    PROBE_CONFIG_NAME  => '/tmp/devel-probe-config.cfg',
+    PROBE_CONFIG_NAME  => '/tmp/devel-probe-config.json',
     PROBE_SIGNAL_NAME  => 'HUP',
 };
 
@@ -47,47 +48,45 @@ sub check_config_file {
 
     printf STDERR ("PROBE check %s %s\n", $signal_name, time());
     Devel::Probe::disable();
-    while (1) {
-        my $path = Path::Tiny::path($config_file);
-        last unless $path && $path->is_file();
 
-        my @lines = $path->lines();
-        foreach my $line (@lines) {
-            next if $line =~ m/^\s*[#]?\s*$/;
-            my @fields = split(' ', $line);
-            next unless @fields;
-            my $op = shift @fields;
-            if ($op eq 'enable') {
-                Devel::Probe::enable();
-                next;
-            }
-            if ($op eq 'disable') {
-                Devel::Probe::disable();
-                next;
-            }
-            if ($op eq 'dump') {
-                Devel::Probe::dump();
-                next;
-            }
-            if ($op eq 'clear') {
-                Devel::Probe::clear();
-                next;
-            }
-            if ($op eq 'probe') {
-                next unless @fields;
+    my $path = Path::Tiny::path($config_file);
+    return unless $path && $path->is_file();
+    my $contents = $path->slurp_utf8();
+    return unless $contents;
+    my $data = JSON::XS->new->utf8->decode($contents);
+    return unless $data;
 
-                my $file = shift @fields;
-                printf STDERR ("PROBE file [%s]\n", $file);
-
-                next unless @fields;
-                foreach my $line (@fields) {
-                    printf STDERR ("PROBE line [%d]\n", $line);
-                    Devel::Probe::add_probe($file, $line);
-                }
-                next;
-            }
+    foreach my $action (@{ $data->{actions} }) {
+        if ($action->{action} eq 'enable') {
+            printf STDERR ("JSON enable\n");
+            Devel::Probe::enable();
+            next;
         }
-        last;
+        if ($action->{action} eq 'disable') {
+            printf STDERR ("JSON disable\n");
+            Devel::Probe::disable();
+            next;
+        }
+        if ($action->{action} eq 'dump') {
+            printf STDERR ("JSON dump\n");
+            Devel::Probe::dump();
+            next;
+        }
+        if ($action->{action} eq 'clear') {
+            printf STDERR ("JSON clear\n");
+            Devel::Probe::clear();
+            next;
+        }
+        if ($action->{action} eq 'define') {
+            my $file = $action->{file};
+            next unless $file;
+            printf STDERR ("JSON file [%s]\n", $file);
+            foreach my $line (@{ $action->{lines} // [] }) {
+                printf STDERR ("JSON line [%d]\n", $line);
+                Devel::Probe::add_probe($file, $line);
+            }
+            next;
+        }
     }
 }
 

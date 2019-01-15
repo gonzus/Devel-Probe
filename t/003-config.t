@@ -2,7 +2,7 @@ use strict;
 use warnings;
 
 use Test::More;
-use Devel::Probe (config_file => 'foo.cfg', check_config_file => 1);
+use Devel::Probe (config_file => 'foo.json', check_config_file => 1);
 
 exit main();
 
