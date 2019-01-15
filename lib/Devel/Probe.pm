@@ -11,7 +11,7 @@ use constant {
     PROBE_SIGNAL_NAME  => 'HUP',
 };
 
-our $VERSION = '0.000002';
+our $VERSION = '0.000003';
 XSLoader::load( 'Devel::Probe', $VERSION );
 
 my %known_options = map +( $_ => 1 ), qw/
@@ -110,7 +110,7 @@ Devel::Probe - Quick & dirty code probes for Perl
 
 =head1 VERSION
 
-Version 0.000002
+Version 0.000003
 
 =head1 SYNOPSIS
 
