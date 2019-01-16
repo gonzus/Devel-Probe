@@ -3,8 +3,6 @@ use strict;
 use warnings;
 
 use XSLoader;
-use Path::Tiny ();
-use JSON::XS   ();
 
 our $VERSION = '0.000003';
 XSLoader::load( 'Devel::Probe', $VERSION );

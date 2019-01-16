@@ -1,21 +1,17 @@
 use strict;
 use warnings;
 
-use Data::Dumper;
-
-use Path::Tiny ();
-use JSON::XS   ();
 use Test::More;
 use Test::Output;
 
-use Devel::Probe (check_config_file => 0);
+use Devel::Probe;
 
 my @triggered;
 my $trigger_file = 't/007-trigger.t'; # this file
 my %trigger_lines = (
-    default   => [qw/ 27 /], # probe 1
-    once      => [qw/ 28 /], # probe 2
-    permanent => [qw/ 29 /], # probe 3
+    default   => [qw/ 23 /], # probe 1
+    once      => [qw/ 24 /], # probe 2
+    permanent => [qw/ 25 /], # probe 3
 );
 
 exit main();
