@@ -312,6 +312,7 @@ OUTPUT: RETVAL
 void
 clear()
 CODE:
+    probe_disable();
     probe_clear();
 
 void

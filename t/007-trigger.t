@@ -31,7 +31,7 @@ sub run {
     my @got = sort { $a->[0] cmp $b->[0] || $a->[1] <=> $b->[1] } @triggered;
 
     my @expected;
-    if ($run > 0) {
+    if ($run != 0 && $run != 4) {
         foreach my $type (keys %trigger_lines) {
             if (($run == 1) || ($run > 1 && $type eq 'permanent')) {
                 push @expected, map { [ $trigger_file, $_ ] } @{ $trigger_lines{$type} };
@@ -44,6 +44,12 @@ sub run {
 }
 
 sub config {
+    # set trigger handler
+    Devel::Probe::trigger(sub {
+        my ($file, $line) = @_;
+        push @triggered, [ $file, $line ]; # store triggered lines in @triggered
+    });
+
     # generate config file
     my @defines;
     foreach my $type (keys %trigger_lines) {
@@ -52,16 +58,10 @@ sub config {
             file => $trigger_file,
             lines => $trigger_lines{$type},
         );
-        if ($type eq 'default') {
-            # don't set it explicitly
-        } elsif ($type eq 'once') {
-            $define{type} = Devel::Probe::PROBE_TYPE_ONCE;
-        } elsif ($type eq 'permanent') {
-            $define{type} = Devel::Probe::PROBE_TYPE_PERMANENT;
-        }
+        $define{type} = $type unless $type eq 'default';
         push @defines, \%define;
     }
-    my $config = {
+    my %config = (
         actions => [
             { action => 'disable' },
             { action => 'clear' },
@@ -69,32 +69,26 @@ sub config {
             { action => 'dump' },
             { action => 'enable' },
         ],
-    };
-    my $tmp = Path::Tiny->tempfile();
-    $tmp->spew(JSON::XS->new->utf8->encode($config));
-    Devel::Probe::set_config_name($tmp);
-
-    # re-read config file
+    );
     my $stderr = stderr_from {
-        Devel::Probe::check_config_file();
+        Devel::Probe::config(\%config);
     };
     foreach my $type (keys %trigger_lines) {
         foreach my $line (@{ $trigger_lines{$type} }) {
             like($stderr, qr/dump line \[$line\]/, "probe dump contains line $line, type $type");
         }
     }
+}
 
-    # set trigger handler
-    Devel::Probe::trigger(sub {
-        my ($file, $line) = @_;
-        push @triggered, [ $file, $line ]; # store triggered lines in @triggered
-    });
+sub clear {
+    Devel::Probe::clear();
 }
 
 sub main {
-    foreach my $run (0..3) {
+    foreach my $run (0..4) {
         run($run);
         config() if $run == 0; # run 0 has no probes enabled
+        clear() if $run == 3; # run 0 has no probes enabled
     }
 
     done_testing;
