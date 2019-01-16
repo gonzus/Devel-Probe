@@ -200,7 +200,7 @@ take advantage of C<PadWalker> to dump the local variables.
     my %config = (
         actions => [
             { action => 'define', # type is 'once' by default
-              file => 'probe my_cool_script.pl', lines => [ 13 ] },
+              file => 'probe my_cool_script.pl', lines => [ 21 ] },
         ],
     );
     Devel::Probe::config(\%config);
