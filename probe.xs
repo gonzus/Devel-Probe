@@ -4,6 +4,10 @@
 #include "XSUB.h"
 #include "ppport.h"
 
+#define PROBE_TYPE_NONE      0
+#define PROBE_TYPE_ONCE      1
+#define PROBE_TYPE_PERMANENT 2
+
 #define PROBE_ACTION_LOOKUP  0
 #define PROBE_ACTION_CREATE  1
 #define PROBE_ACTION_REMOVE  2
@@ -62,7 +66,7 @@ static inline void probe_invoke_callback(const char* file, int line, SV* callbac
     LEAVE;
 }
 
-static int probe_lookup(const char* file, int line, int action)
+static int probe_lookup(const char* file, int line, int type, int action)
 {
     U32 klen = strlen(file);
     char kstr[20];
@@ -82,28 +86,32 @@ static int probe_lookup(const char* file, int line, int action)
         hv_store(probe_hash, file, klen, slines, 0);
         INFO(("PROBE created entry for file [%s]: %p\n", file, lines));
     } else {
-        return 0;
+        return PROBE_TYPE_NONE;
     }
 
     klen = sprintf(kstr, "%d", line);
     rflag = hv_fetch(lines, kstr, klen, 0);
     if (rflag) {
+        int ret = 0;
         flag = *rflag;
+        ret = SvIV(flag);
         if (action == PROBE_ACTION_REMOVE) {
             /* TODO: remove file name when last line for file was removed? */
             hv_delete(lines, kstr, klen, G_DISCARD);
+            INFO(("PROBE removed entry for line [%s] => %d\n", kstr, ret));
         }
-        return SvTRUE(flag);
+        return ret;
     } else if (action == PROBE_ACTION_CREATE) {
-        flag = &PL_sv_yes;
+        flag = newSViv(type);
         hv_store(lines, kstr, klen, flag, 0);
-        INFO(("PROBE created entry for line [%s]\n", kstr));
-        return SvTRUE(flag);
+        INFO(("PROBE created entry for line [%s] => %d\n", kstr, type));
+        return type;
     } else {
-        return 0;
+        return PROBE_TYPE_NONE;
     }
 
-    return 0;
+    /* catch any mistakes */
+    return PROBE_TYPE_NONE;
 }
 
 /*
@@ -117,6 +125,7 @@ static OP* probe_nextstate(pTHX)
     do {
         const char* file = 0;
         int line = 0;
+        int type = PROBE_TYPE_NONE;
 
         if (!probe_is_enabled()) {
             break;
@@ -125,16 +134,19 @@ static OP* probe_nextstate(pTHX)
         file = CopFILE(PL_curcop);
         line = CopLINE(PL_curcop);
         TRACE(("PROBE check [%s] [%d]\n", file, line));
-        if (!probe_lookup(file, line, PROBE_ACTION_LOOKUP )) {
+        type = probe_lookup(file, line, PROBE_TYPE_NONE, PROBE_ACTION_LOOKUP);
+        if (type == PROBE_TYPE_NONE) {
             break;
         }
 
-        INFO(("PROBE triggered [%s] [%d]\n", file, line));
-        if (!probe_trigger_cb) {
-            break;
+        INFO(("PROBE triggered [%s] [%d] [%d]\n", file, line, type));
+        if (probe_trigger_cb) {
+            probe_invoke_callback(file, line, probe_trigger_cb);
         }
 
-        probe_invoke_callback(file, line, probe_trigger_cb);
+        if (type == PROBE_TYPE_ONCE) {
+            probe_lookup(file, line, type, PROBE_ACTION_REMOVE);
+        }
     } while (0);
 
     return ret;
@@ -308,9 +320,9 @@ CODE:
     probe_dump();
 
 void
-add_probe(const char* file, int line)
+add_probe(const char* file, int line, int type)
 CODE:
-    probe_lookup(file, line, PROBE_ACTION_CREATE);
+    probe_lookup(file, line, type, PROBE_ACTION_CREATE);
 
 void
 trigger(SV* callback)

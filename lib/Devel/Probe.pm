@@ -11,6 +11,16 @@ use constant {
     PROBE_SIGNAL_NAME  => 'HUP',
 };
 
+use constant {
+    PROBE_TYPE_NONE         => 0,
+    PROBE_TYPE_ONCE         => 1,
+    PROBE_TYPE_PERMANENT    => 2,
+};
+
+use constant {
+    PROBE_TYPE_DEFAULT      => PROBE_TYPE_ONCE,
+};
+
 our $VERSION = '0.000003';
 XSLoader::load( 'Devel::Probe', $VERSION );
 
@@ -87,9 +97,10 @@ sub check_config_file {
         }
         if ($action->{action} eq 'define') {
             my $file = $action->{file};
+            my $type = $action->{type} // PROBE_TYPE_DEFAULT;
             next unless $file;
             foreach my $line (@{ $action->{lines} // [] }) {
-                Devel::Probe::add_probe($file, $line);
+                Devel::Probe::add_probe($file, $line, $type);
             }
             next;
         }
