@@ -4,6 +4,10 @@
 #include "XSUB.h"
 #include "ppport.h"
 
+#define PROBE_ACTION_LOOKUP  0
+#define PROBE_ACTION_CREATE  1
+#define PROBE_ACTION_REMOVE  2
+
 /*
  * Use preprocessor macros for time-sensitive operations.
  */
@@ -58,37 +62,48 @@ static inline void probe_invoke_callback(const char* file, int line, SV* callbac
     LEAVE;
 }
 
-static int probe_lookup(const char* file, int line, int create)
+static int probe_lookup(const char* file, int line, int action)
 {
     U32 klen = strlen(file);
-    SV** rlines = hv_fetch(probe_hash, file, klen, 0);
-    HV* lines = 0;
     char kstr[20];
+    SV** rlines = 0;
+    SV** rflag = 0;
+    HV* lines = 0;
+    SV* flag = 0;
 
+    rlines = hv_fetch(probe_hash, file, klen, 0);
     if (rlines) {
         lines = (HV*) SvRV(*rlines);
         TRACE(("PROBE found entry for file [%s]: %p\n", file, lines));
-    } else if (!create) {
-        return 0;
-    } else {
+    } else if (action == PROBE_ACTION_CREATE) {
         SV* slines = 0;
         lines = newHV();
         slines = (SV*) newRV((SV*) lines);
         hv_store(probe_hash, file, klen, slines, 0);
-        TRACE(("PROBE created entry for file [%s]: %p\n", file, lines));
+        INFO(("PROBE created entry for file [%s]: %p\n", file, lines));
+    } else {
+        return 0;
     }
 
     klen = sprintf(kstr, "%d", line);
-    if (!create) {
-        SV** rflag = hv_fetch(lines, kstr, klen, 0);
-        return rflag && SvTRUE(*rflag);
-    } else {
-        SV* flag = &PL_sv_yes;
+    rflag = hv_fetch(lines, kstr, klen, 0);
+    if (rflag) {
+        flag = *rflag;
+        if (action == PROBE_ACTION_REMOVE) {
+            /* TODO: remove file name when last line for file was removed? */
+            hv_delete(lines, kstr, klen, G_DISCARD);
+        }
+        return SvTRUE(flag);
+    } else if (action == PROBE_ACTION_CREATE) {
+        flag = &PL_sv_yes;
         hv_store(lines, kstr, klen, flag, 0);
-        TRACE(("PROBE created entry for line [%s]\n", kstr));
+        INFO(("PROBE created entry for line [%s]\n", kstr));
+        return SvTRUE(flag);
+    } else {
+        return 0;
     }
 
-    return 1;
+    return 0;
 }
 
 /*
@@ -110,7 +125,7 @@ static OP* probe_nextstate(pTHX)
         file = CopFILE(PL_curcop);
         line = CopLINE(PL_curcop);
         TRACE(("PROBE check [%s] [%d]\n", file, line));
-        if (!probe_lookup(file, line, 0)) {
+        if (!probe_lookup(file, line, PROBE_ACTION_LOOKUP )) {
             break;
         }
 
@@ -295,7 +310,7 @@ CODE:
 void
 add_probe(const char* file, int line)
 CODE:
-    probe_lookup(file, line, 1);
+    probe_lookup(file, line, PROBE_ACTION_CREATE);
 
 void
 trigger(SV* callback)
