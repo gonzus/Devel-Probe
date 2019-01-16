@@ -4,7 +4,7 @@ use warnings;
 
 use XSLoader;
 
-our $VERSION = '0.000003';
+our $VERSION = '0.000004';
 XSLoader::load( 'Devel::Probe', $VERSION );
 
 sub import {
@@ -70,7 +70,7 @@ Devel::Probe - Quick & dirty code probes for Perl
 
 =head1 VERSION
 
-Version 0.000003
+Version 0.000004
 
 =head1 SYNOPSIS
 
