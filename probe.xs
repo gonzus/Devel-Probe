@@ -4,13 +4,17 @@
 #include "XSUB.h"
 #include "ppport.h"
 
+/*
+ * Use preprocessor macros for time-sensitive operations.
+ */
+#define probe_is_enabled() !!probe_enabled
+
 static Perl_ppaddr_t probe_nextstate_orig = 0;
 static int probe_installed = 0;
 static int probe_enabled = 0;
 static HV* probe_hash = 0;
 static SV* probe_trigger_cb = 0;
 
-static int probe_is_enabled(void);
 static void probe_enable(void);
 static void probe_disable(void);
 static int probe_is_installed(void);
@@ -87,6 +91,10 @@ static int probe_lookup(const char* file, int line, int create)
     return 1;
 }
 
+/*
+ * This function will run for every single line in your Perl code.
+ * You would do well to make it as cheap as possible.
+ */
 static OP* probe_nextstate(pTHX)
 {
     OP* ret = probe_nextstate_orig(aTHX);
@@ -101,7 +109,6 @@ static OP* probe_nextstate(pTHX)
 
         file = CopFILE(PL_curcop);
         line = CopLINE(PL_curcop);
-        // it isn't always obvious what file path is being used (e.g., what you should put in the cfg file)
         TRACE(("PROBE check [%s] [%d]\n", file, line));
         if (!probe_lookup(file, line, 0)) {
             break;
@@ -171,11 +178,6 @@ static void probe_dump(void)
             fprintf(stderr, "PROBE dump line [%s]\n", kstr);
         }
     }
-}
-
-static int probe_is_enabled(void)
-{
-    return probe_enabled;
 }
 
 static void probe_enable(void)
