@@ -95,28 +95,43 @@ The probing code is installed when you import the module, and it is disabled.
 In these conditions, the probe code is light enough that it should cause no
 impact at all in your CPU usage.
 
-You can call C<trigger(\&coderef)> to specify a piece of Perl code that will be
-called for every probe that triggers.
+=head1 FUNCTIONS
 
-You can call C<config(\%config)> to specify a configuration for the module,
-including what lines in your code will cause probes to be triggered.  This call
-will always disable the module as a first action, so you always need to
-explicitly enable it again, either from the configuration itself or in a
-further call to C<enable()>.
+=over 4
 
-You can call C<add_probe(file, line, type)> to manually add a probe; this is
-what gets called from C<config()>.
+=item * C<trigger(\&coderef)>
 
-You can call C<enable()> / C<disable()> to dynamically activate and deactivate
-probing.  You can check this status by calling C<is_enabled()>.
+Specify a piece of Perl code that will be called for every probe that triggers.
 
-You can call C<install()> / C<remove()> to install or remove the probe handling
-code.  You can check this status by calling C<is_installed()>.  When you import
-the module, C<install()> is called automatically for you.
+=item * C<config(\%config)>
 
-You can call C<clear()> to remove all probes.
+Specify a configuration for the module, including what lines in your code will
+cause probes to be triggered.  This call will always disable the module as a
+first action, so you always need to explicitly enable it again, either from the
+configuration itself or in a further call to C<enable()>.
 
-You can call C<dump()> to print all probes to stderr.
+=item * C<add_probe(file, line, type)>
+
+Manually add a probe; this is what gets called from C<config()>.
+
+=item * C<enable()> / C<disable()>  / C<is_enabled()>
+
+Dynamically activate and deactivate probing, and check this status.
+
+=item * C<install()> / C<remove()> / C<is_installed()>
+
+Install or remove the probe handling code, and check this status.  When you
+import the module, C<install()> is called automatically for you.
+
+=item * C<clear()>
+
+Remove all probes.
+
+=item * C<dump()>
+
+Print all probes to stderr.
+
+=back
 
 =head1 CONFIGURATION
 
