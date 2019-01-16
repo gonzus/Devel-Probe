@@ -101,9 +101,12 @@ Version 0.000004
 Use this module to allow the possibility of creating probes for some lines in
 your code.
 
-The probing code is installed when you import the module, and it is disabled.
+The probing code is installed when you import the module, but it is disabled.
 In these conditions, the probe code is light enough that it should cause no
-impact at all in your CPU usage.
+impact at all in your CPU usage; an impact might be noticed when you enable the
+module and configure some probes, particularly depending on the frequency with
+which those probes will be triggered, and how heavy the trigger callback turns
+out to be.
 
 =head1 FUNCTIONS
 
@@ -122,7 +125,8 @@ configuration itself or in a further call to C<enable()>.
 
 =item * C<add_probe(file, line, type)>
 
-Manually add a probe; this is what gets called from C<config()>.
+Manually add a probe.  This is what gets called from C<config()> when adding
+probes; please see the CONFIGURATION example for more information.
 
 =item * C<enable()> / C<disable()>  / C<is_enabled()>
 
@@ -184,7 +188,8 @@ are:
 =over 4
 
 =item * C<once>: the probe will trigger once and then will be destroyed right
-after that.
+after that.  This default makes it more difficult to overwhelm your system with
+too much probing, unless you explicitly request a different type of probe.
 
 =item * C<permanent>: the probe will trigger every time that line of code is
 executed.
@@ -195,9 +200,13 @@ executed.
 
 =head1 EXAMPLE
 
-This will invoke the C<trigger> callback the first time line 21 executes, and
-take advantage of C<PadWalker> to dump the local variables.
+This will invoke the callback defined with the call to C<trigger()>, the first
+time line 21 executes, taking advantage of C<PadWalker> to dump the local
+variables.  After that first execution, that particular probe will not be
+triggered anymore.  For line 22, every time that line is executed the probe
+will be triggered.
 
+    # line 1 of s.pl
     use Data::Dumper qw(Dumper);
     use PadWalker qw(peek_my);
     use Devel::Probe;
@@ -209,29 +218,32 @@ take advantage of C<PadWalker> to dump the local variables.
 
     my %config = (
         actions => [
-            { action => 'define', # type is 'once' by default
-              file => 'probe my_cool_script.pl', lines => [ 21 ] },
+            { action => 'define', file => 's.pl', lines => [ 21 ] },
+            { action => 'define', file => 's.pl', type = 'permanent', lines => [ 22 ] },
         ],
     );
     Devel::Probe::config(\%config);
     Devel::Probe::enable();
     my $count;
     while (1) {
-        $count++;
-        my $something_inside_the_loop = $count * 2; # line 21
+        $count++;                                   # line 21
+        my $something_inside_the_loop = $count * 2; # line 22
         sleep 5;
     }
     Devel::Probe::disable();
 
 =head1 SUGGESTIONS
 
+For files found directly by the Perl interpreter, the file name in the probe
+definition will usually be a relative path name; for files that are found
+through the PERL5LIB environment variable, the file name in the probe
+definition will usually be a full path name.
+
 One typical use case would be to have a signal handler associated with a
 specific signal, which when triggered would disable the module, read the
 configuration from a given place, reconfigure the module accordingly and then
-enable it.
-
-Another use case could be a similar kind of control using remote endpoints to
-deal with reconfiguring, disabling and enabling the module.
+enable it.  Similarly, this kind of control can be implemented using remote
+endpoints to deal with reconfiguring, disabling and enabling the module.
 
 =head1 TODO
 
