@@ -216,18 +216,25 @@ static void probe_enable(void)
     probe_enabled = 1;
 }
 
+static void probe_clear(void)
+{
+    if (probe_hash) {
+        hv_clear(probe_hash);
+    } else {
+        probe_hash = newHV();
+    }
+    INFO(("PROBE cleared\n"));
+}
+
 static void probe_reset(int installed)
 {
     probe_installed = installed;
     probe_enabled = 0;
-    probe_hash = 0;
+    probe_clear();
+    if (probe_trigger_cb) {
+        SvREFCNT_dec(probe_trigger_cb);
+    }
     probe_trigger_cb = 0;
-}
-
-static void probe_clear(void)
-{
-    probe_hash = newHV();
-    INFO(("PROBE cleared\n"));
 }
 
 static void probe_disable(void)
