@@ -11,6 +11,9 @@
 #define PROBE_ACTION_LOOKUP  0
 #define PROBE_ACTION_REMOVE  1
 
+#define PROBE_SETTINGS_TYPE_INDEX 0
+#define PROBE_SETTINGS_ARGS_INDEX 1
+
 /*
  * Use preprocessor macros for time-sensitive operations.
  */
@@ -41,7 +44,7 @@ void dbg_printf(const char *fmt, ...)
     va_end(args);
 }
 
-static inline void probe_invoke_callback(const char* file, int line, SV* callback)
+static inline void probe_invoke_callback(const char* file, int line, SV* user_arg, SV* callback)
 {
     int count;
 
@@ -51,9 +54,12 @@ static inline void probe_invoke_callback(const char* file, int line, SV* callbac
     SAVETMPS;
 
     PUSHMARK (SP);
-    EXTEND(SP, 2);
+    EXTEND(SP, user_arg ? 3 : 2);
     XPUSHs(sv_2mortal(newSVpv(file, 0)));
     XPUSHs(sv_2mortal(newSViv(line)));
+    if (user_arg) {
+        XPUSHs(user_arg);
+    }
     PUTBACK;
 
     count = call_sv(callback, G_VOID|G_DISCARD);
@@ -65,41 +71,67 @@ static inline void probe_invoke_callback(const char* file, int line, SV* callbac
     LEAVE;
 }
 
-static int probe_lookup(const char* file, int line, int action)
+static bool probe_lookup(const char* file, int line, int action)
 {
     U32 klen = strlen(file);
     char kstr[20];
     SV** rlines = 0;
-    SV** rflag = 0;
     HV* lines = 0;
-    SV* flag = 0;
 
     rlines = hv_fetch(probe_hash, file, klen, 0);
     if (rlines) {
         lines = (HV*) SvRV(*rlines);
         TRACE(("PROBE found entry for file [%s]: %p\n", file, lines));
     } else {
-        return PROBE_TYPE_NONE;
+        return false;
     }
 
     klen = sprintf(kstr, "%d", line);
-    rflag = hv_fetch(lines, kstr, klen, 0);
-    if (rflag) {
-        int ret = 0;
-        flag = *rflag;
-        ret = SvIV(flag);
+    if (hv_exists(lines, kstr, klen)) {
         if (action == PROBE_ACTION_REMOVE) {
             /* TODO: remove file name when last line for file was removed? */
             hv_delete(lines, kstr, klen, G_DISCARD);
-            INFO(("PROBE removed entry for line [%s] => %d\n", kstr, ret));
+            INFO(("PROBE removed entry for line [%s]\n", kstr));
         }
-        return ret;
+        return true;
     } else {
-        return PROBE_TYPE_NONE;
+        return false;
     }
 
     /* catch any mistakes */
-    return PROBE_TYPE_NONE;
+    return false;
+}
+
+static AV* probe_settings(const char* file, int line)
+{
+    U32 klen = strlen(file);
+    char kstr[20];
+    SV** rlines = 0;
+    HV* lines = 0;
+    SV** rsettings = 0;
+    AV* settings = 0;
+
+    rlines = hv_fetch(probe_hash, file, klen, 0);
+    if (rlines) {
+        lines = (HV*) SvRV(*rlines);
+    } else {
+        return 0;
+    }
+
+    klen = sprintf(kstr, "%d", line);
+    rsettings = hv_fetch(lines, kstr, klen, 0);
+    if (rsettings) {
+        if (!SvROK(*rsettings) || SvTYPE(SvRV(*rsettings)) != SVt_PVAV) {
+            croak("Devel::Probe settings must be an ARRAY ref");
+        }
+
+        settings = (AV*) SvRV(*rsettings);
+        return settings;
+    } else {
+        return 0;
+    }
+
+    return 0;
 }
 
 /*
@@ -113,6 +145,8 @@ static OP* probe_nextstate(pTHX)
     do {
         const char* file = 0;
         int line = 0;
+        AV* settings = 0;
+        SV* user_callback_arg = 0;
         int type = PROBE_TYPE_NONE;
 
         if (!probe_is_enabled()) {
@@ -122,14 +156,23 @@ static OP* probe_nextstate(pTHX)
         file = CopFILE(PL_curcop);
         line = CopLINE(PL_curcop);
         TRACE(("PROBE check [%s] [%d]\n", file, line));
-        type = probe_lookup(file, line, PROBE_ACTION_LOOKUP);
-        if (type == PROBE_TYPE_NONE) {
+        if (!probe_lookup(file, line, PROBE_ACTION_LOOKUP)) {
             break;
+        }
+
+        settings = probe_settings(file, line);
+        if (!settings) {
+            break;
+        }
+
+        type = SvIV(*(av_fetch(settings, PROBE_SETTINGS_TYPE_INDEX, 0)));
+        if (av_top_index(settings) == PROBE_SETTINGS_ARGS_INDEX) {
+            user_callback_arg = *(av_fetch(settings, PROBE_SETTINGS_ARGS_INDEX, 0));
         }
 
         INFO(("PROBE triggered [%s] [%d] [%d]\n", file, line, type));
         if (probe_trigger_cb) {
-            probe_invoke_callback(file, line, probe_trigger_cb);
+            probe_invoke_callback(file, line, user_callback_arg, probe_trigger_cb);
         }
 
         if (type == PROBE_TYPE_ONCE) {

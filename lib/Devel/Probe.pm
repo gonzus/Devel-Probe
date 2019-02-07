@@ -44,8 +44,9 @@ sub config {
             next unless $file;
 
             my $type = $action->{type} // ONCE;
+            my $args = $action->{args};
             foreach my $line (@{ $action->{lines} // [] }) {
-                add_probe($file, $line, $type);
+                add_probe($file, $line, $type, $args);
             }
             next;
         }
@@ -53,12 +54,13 @@ sub config {
 }
 
 sub add_probe {
-    my ($file, $line, $type) = @_;
+    my ($file, $line, $type, $args) = @_;
     if ($type ne ONCE && $type ne PERMANENT) {
         croak sprintf("'%s' is not a valid probe type: try Devel::Probe::ONCE|PERMANENT", $type);
     }
+
     my $probes = Devel::Probe::_internal_probe_state();
-    $probes->{$file}->{$line} = $type;
+    $probes->{$file}->{$line} = [$type, defined $args ? $args : ()];
 }
 
 sub dump {
