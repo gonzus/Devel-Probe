@@ -9,8 +9,8 @@ my @triggered;
 my $trigger_file = 't/007-trigger.t'; # this file
 my %trigger_lines = (
     default   => [qw/ 22 /], # probe 1
-    once      => [qw/ 23 /], # probe 2
-    permanent => [qw/ 24 /], # probe 3
+    Devel::Probe::ONCE      ,=> [qw/ 23 /], # probe 2
+    Devel::Probe::PERMANENT ,=> [qw/ 24 /], # probe 3
 );
 
 exit main();
@@ -28,7 +28,7 @@ sub run {
     my @expected;
     if ($run != 0 && $run != 4) {
         foreach my $type (keys %trigger_lines) {
-            if (($run == 1) || ($run > 1 && $type eq 'permanent')) {
+            if (($run == 1) || ($run > 1 && $type eq Devel::Probe::PERMANENT)) {
                 push @expected, map { [ $trigger_file, $_ ] } @{ $trigger_lines{$type} };
             }
         }
