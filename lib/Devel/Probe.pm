@@ -2,6 +2,7 @@ package Devel::Probe;
 use strict;
 use warnings;
 
+use Storable qw(dclone);
 use XSLoader;
 
 our $VERSION = '0.000004';
@@ -35,10 +36,6 @@ sub config {
             Devel::Probe::disable();
             next;
         }
-        if ($action->{action} eq 'dump') {
-            Devel::Probe::dump();
-            next;
-        }
         if ($action->{action} eq 'clear') {
             Devel::Probe::clear();
             next;
@@ -55,6 +52,10 @@ sub config {
             next;
         }
     }
+}
+
+sub dump {
+    return dclone(Devel::Probe::_internal_probe_state());
 }
 
 1;

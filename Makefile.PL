@@ -9,10 +9,10 @@ WriteMakefile(
     MIN_PERL_VERSION => 5.018000,
     PREREQ_PM      => {
         'XSLoader'     => 0,
+        'Storable'     => 0
     },
     TEST_REQUIRES  => {
         'Test::More'   => 0,
-        'Test::Output' => 0,
         'Devel::Leak' => 0,
     },
     AUTHOR         => [
