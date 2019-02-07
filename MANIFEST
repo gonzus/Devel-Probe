@@ -9,6 +9,8 @@ t/005-status-enabled.t
 t/007-trigger.t
 t/008-trigger-after-reinstall.t
 
+t/009-memleak.t
+
 Changes
 LICENSE
 Makefile.PL

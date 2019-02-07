@@ -13,6 +13,7 @@ WriteMakefile(
     TEST_REQUIRES  => {
         'Test::More'   => 0,
         'Test::Output' => 0,
+        'Devel::Leak' => 0,
     },
     AUTHOR         => [
         'Gonzalo Diethelm (gonzus@cpan.org)',
