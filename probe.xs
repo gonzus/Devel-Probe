@@ -44,7 +44,7 @@ void dbg_printf(const char *fmt, ...)
     va_end(args);
 }
 
-static inline void probe_invoke_callback(const char* file, int line, SV* user_arg, SV* callback)
+static void probe_invoke_callback(const char* file, int line, SV* user_arg, SV* callback)
 {
     int count;
 
