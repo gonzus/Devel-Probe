@@ -4,9 +4,7 @@ use Test::More;
 use Devel::Probe;
 use Devel::Leak;
 
-use constant ONCE => 1;
-
-my @probe = (__FILE__, 40, ONCE);
+my @probe = (__FILE__, 40, Devel::Probe::ONCE);
 sub probe_cb { }
 
 leak_test(sub {

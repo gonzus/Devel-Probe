@@ -2,7 +2,9 @@ package Devel::Probe;
 use strict;
 use warnings;
 
+use Storable qw(dclone);
 use XSLoader;
+use Carp qw(croak);
 
 our $VERSION = '0.000004';
 XSLoader::load( 'Devel::Probe', $VERSION );
@@ -12,13 +14,11 @@ sub import {
     Devel::Probe::install();
 }
 
-my @probe_type_names = (
-    'none',
-    'once',
-    'permanent',
-);
-my %probe_type_name_to_type = map { $probe_type_names[$_] => $_ }
-                              (0..scalar(@probe_type_names)-1);
+use constant {
+    NONE => 0,
+    ONCE => 1,
+    PERMANENT => 2,
+};
 
 sub config {
     my ($config) = @_;
@@ -35,10 +35,6 @@ sub config {
             Devel::Probe::disable();
             next;
         }
-        if ($action->{action} eq 'dump') {
-            Devel::Probe::dump();
-            next;
-        }
         if ($action->{action} eq 'clear') {
             Devel::Probe::clear();
             next;
@@ -47,14 +43,20 @@ sub config {
             my $file = $action->{file};
             next unless $file;
 
-            my $type_name = $action->{type} // 'once';
-            my $type = $probe_type_name_to_type{$type_name} // 1;
+            my $type = $action->{type} // ONCE;
+            if ($type ne ONCE && $type ne PERMANENT) {
+                croak sprintf("'%s' is not a valid probe type: try Devel::Probe::ONCE|PERMANENT", $type);
+            }
             foreach my $line (@{ $action->{lines} // [] }) {
                 Devel::Probe::add_probe($file, $line, $type);
             }
             next;
         }
     }
+}
+
+sub dump {
+    return dclone(Devel::Probe::_internal_probe_state());
 }
 
 1;

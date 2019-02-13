@@ -152,61 +152,6 @@ static OP* probe_nextstate(pTHX)
     return ret;
 }
 
-static void probe_dump(void)
-{
-    hv_iterinit(probe_hash);
-    while (1) {
-        SV* key = 0;
-        SV* value = 0;
-        char* kstr = 0;
-        STRLEN klen = 0;
-        HV* lines = 0;
-        HE* entry = hv_iternext(probe_hash);
-        if (!entry) {
-            break; /* no more hash keys */
-        }
-        key = hv_iterkeysv(entry);
-        if (!key) {
-            continue; /* invalid key */
-        }
-        kstr = SvPV(key, klen);
-        if (!kstr) {
-            continue; /* invalid key */
-        }
-        fprintf(stderr, "PROBE dump file [%s]\n", kstr);
-
-        value = hv_iterval(probe_hash, entry);
-        if (!value) {
-            continue; /* invalid value */
-        }
-        lines = (HV*) SvRV(value);
-        hv_iterinit(lines);
-        while (1) {
-            SV* key = 0;
-            SV* value = 0;
-            char* kstr = 0;
-            STRLEN klen = 0;
-            HE* entry = hv_iternext(lines);
-            if (!entry) {
-                break; /* no more hash keys */
-            }
-            key = hv_iterkeysv(entry);
-            if (!key) {
-                continue; /* invalid key */
-            }
-            kstr = SvPV(key, klen);
-            if (!kstr) {
-                continue; /* invalid key */
-            }
-            value = hv_iterval(lines, entry);
-            if (!value || !SvTRUE(value)) {
-                continue;
-            }
-            fprintf(stderr, "PROBE dump line [%s]\n", kstr);
-        }
-    }
-}
-
 static void probe_enable(void)
 {
     if (probe_is_enabled()) {
@@ -322,10 +267,11 @@ CODE:
     probe_disable();
     probe_clear();
 
-void
-dump()
+HV *
+_internal_probe_state()
 CODE:
-    probe_dump();
+    RETVAL = probe_hash;
+OUTPUT: RETVAL
 
 void
 add_probe(const char* file, int line, int type)
