@@ -9,11 +9,12 @@ WriteMakefile(
     MIN_PERL_VERSION => 5.018000,
     PREREQ_PM      => {
         'XSLoader'     => 0,
-        'Storable'     => 0
+        'Carp'         => 0,
+        'Storable'     => 0,
     },
     TEST_REQUIRES  => {
         'Test::More'   => 0,
-        'Devel::Leak' => 0,
+        'Devel::Leak'  => 0,
     },
     AUTHOR         => [
         'Gonzalo Diethelm (gonzus@cpan.org)',
