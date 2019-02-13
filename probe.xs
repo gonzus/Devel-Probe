@@ -9,8 +9,7 @@
 #define PROBE_TYPE_PERMANENT 2
 
 #define PROBE_ACTION_LOOKUP  0
-#define PROBE_ACTION_CREATE  1
-#define PROBE_ACTION_REMOVE  2
+#define PROBE_ACTION_REMOVE  1
 
 /*
  * Use preprocessor macros for time-sensitive operations.
@@ -66,7 +65,7 @@ static inline void probe_invoke_callback(const char* file, int line, SV* callbac
     LEAVE;
 }
 
-static int probe_lookup(const char* file, int line, int type, int action)
+static int probe_lookup(const char* file, int line, int action)
 {
     U32 klen = strlen(file);
     char kstr[20];
@@ -79,12 +78,6 @@ static int probe_lookup(const char* file, int line, int type, int action)
     if (rlines) {
         lines = (HV*) SvRV(*rlines);
         TRACE(("PROBE found entry for file [%s]: %p\n", file, lines));
-    } else if (action == PROBE_ACTION_CREATE) {
-        SV* slines = 0;
-        lines = newHV();
-        slines = (SV*) newRV((SV*) lines);
-        hv_store(probe_hash, file, klen, slines, 0);
-        INFO(("PROBE created entry for file [%s]: %p\n", file, lines));
     } else {
         return PROBE_TYPE_NONE;
     }
@@ -101,11 +94,6 @@ static int probe_lookup(const char* file, int line, int type, int action)
             INFO(("PROBE removed entry for line [%s] => %d\n", kstr, ret));
         }
         return ret;
-    } else if (action == PROBE_ACTION_CREATE) {
-        flag = newSViv(type);
-        hv_store(lines, kstr, klen, flag, 0);
-        INFO(("PROBE created entry for line [%s] => %d\n", kstr, type));
-        return type;
     } else {
         return PROBE_TYPE_NONE;
     }
@@ -134,7 +122,7 @@ static OP* probe_nextstate(pTHX)
         file = CopFILE(PL_curcop);
         line = CopLINE(PL_curcop);
         TRACE(("PROBE check [%s] [%d]\n", file, line));
-        type = probe_lookup(file, line, PROBE_TYPE_NONE, PROBE_ACTION_LOOKUP);
+        type = probe_lookup(file, line, PROBE_ACTION_LOOKUP);
         if (type == PROBE_TYPE_NONE) {
             break;
         }
@@ -145,7 +133,7 @@ static OP* probe_nextstate(pTHX)
         }
 
         if (type == PROBE_TYPE_ONCE) {
-            probe_lookup(file, line, type, PROBE_ACTION_REMOVE);
+            probe_lookup(file, line, PROBE_ACTION_REMOVE);
         }
     } while (0);
 
@@ -272,11 +260,6 @@ _internal_probe_state()
 CODE:
     RETVAL = probe_hash;
 OUTPUT: RETVAL
-
-void
-add_probe(const char* file, int line, int type)
-CODE:
-    probe_lookup(file, line, type, PROBE_ACTION_CREATE);
 
 void
 trigger(SV* callback)
