@@ -44,9 +44,9 @@ sub config {
             next unless $file;
 
             my $type = $action->{type} // ONCE;
-            my $args = $action->{args};
+            my $argument = $action->{argument};
             foreach my $line (@{ $action->{lines} // [] }) {
-                add_probe($file, $line, $type, $args);
+                add_probe($file, $line, $type, $argument);
             }
             next;
         }
@@ -54,13 +54,13 @@ sub config {
 }
 
 sub add_probe {
-    my ($file, $line, $type, $args) = @_;
+    my ($file, $line, $type, $argument) = @_;
     if ($type ne ONCE && $type ne PERMANENT) {
         croak sprintf("'%s' is not a valid probe type: try Devel::Probe::ONCE|PERMANENT", $type);
     }
 
     my $probes = Devel::Probe::_internal_probe_state();
-    $probes->{$file}->{$line} = [$type, defined $args ? $args : ()];
+    $probes->{$file}->{$line} = [$type, defined $argument ? $argument : ()];
 }
 
 sub dump {
@@ -184,7 +184,7 @@ Possible actions are:
         type => PROBE_TYPE,
         file => 'file_name',
         lines => [ 10, 245, 333 ],
-        args => $my_callback_argument,
+        argument => $my_callback_argument,
     );
 
 The type field is optional and its default value is C<Devel::Probe::ONCE>.  Possible values
@@ -201,7 +201,7 @@ executed.
 
 =back
 
-The C<args> field is optional and its default value is undefined. Possible
+The C<argument> field is optional and its default value is undefined. Possible
 values are any Perl scalar.  If present, it will be passed to the C<trigger>
 callback as the third argument.
 
@@ -256,7 +256,7 @@ As another example, you can pass a custom argument to the trigger callback:
     my %config = (
         actions => [
             { action => 'enable' },
-            { action => 'define', file => __FILE__, lines => [ 23 ], args => '$squared' },
+            { action => 'define', file => __FILE__, lines => [ 23 ], argument => '$squared' },
         ],
     );
     Devel::Probe::config(\%config);
