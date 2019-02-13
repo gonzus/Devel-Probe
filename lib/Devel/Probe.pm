@@ -216,6 +216,7 @@ triggered anymore.  For line 22, every time that line is executed the probe
 will be triggered.
 
     # line 1
+    use 5.18.0;
     use Data::Dumper qw(Dumper);
     use PadWalker qw(peek_my);
     use Devel::Probe;
@@ -227,16 +228,16 @@ will be triggered.
 
     my %config = (
         actions => [
-            { action => 'define', file => __FILE__, lines => [ 21 ] },
-            { action => 'define', file => __FILE__, type = Devel::Probe::PERMANENT, lines => [ 22 ] },
+            { action => 'define', file => __FILE__, lines => [ 22 ] },
+            { action => 'define', file => __FILE__, type => Devel::Probe::PERMANENT, lines => [ 23 ] },
         ],
     );
     Devel::Probe::config(\%config);
     Devel::Probe::enable();
     my $count;
     while (1) {
-        $count++;                                   # line 21
-        my $something_inside_the_loop = $count * 2; # line 22
+        $count++;                                   # line 22
+        my $something_inside_the_loop = $count * 2; # line 23
         sleep 5;
     }
     Devel::Probe::disable();
@@ -244,19 +245,24 @@ will be triggered.
 As another example, you can pass a custom argument to the trigger callback:
 
     # line 1
-    use Data::Dumper qw(Dumper);
+    use 5.18.0;
     use PadWalker qw(peek_my);
     use Devel::Probe;
 
     Devel::Probe::trigger(sub {
         my ($file, $line, $interesting_var_name) = @_;
-        say Dumper(peek_my(1)->{$interesting_var_name}); # dump only '$squared'
+        say "$interesting_var_name: " . ${ peek_my(1)->{$interesting_var_name} };
     });
 
     my %config = (
         actions => [
             { action => 'enable' },
-            { action => 'define', file => __FILE__, lines => [ 23 ], argument => '$squared' },
+            { action => 'define',
+              file => __FILE__,
+              type => Devel::Probe::PERMANENT,
+              lines => [ 26 ],
+              argument => '$squared'
+            },
         ],
     );
     Devel::Probe::config(\%config);
@@ -264,8 +270,8 @@ As another example, you can pass a custom argument to the trigger callback:
     my $squared = 0;
     while (1) {
         $count++;
-        $squared = $count * $count;
-        sleep 5; # line 23
+        $squared = $count * $count; # line 26
+        sleep 5;
     }
 
 =head1 SUGGESTIONS
