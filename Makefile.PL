@@ -20,6 +20,7 @@ WriteMakefile(
     ],
     INC            => '-I.',
     OBJECT         => '$(O_FILES)',
+    CCFLAGS        => ' -std=c89',
     META_MERGE     => {
         'meta-spec' => { version => 2 },
         resources   => {
@@ -51,5 +52,6 @@ sub cflags {
     foreach (@cflags) {
         $_ = "CCFLAGS = $self->{CCFLAGS}" if /^CCFLAGS/;
     }
+
     return $self->{CFLAGS} = join("\n", @cflags) . "\n";
 }
