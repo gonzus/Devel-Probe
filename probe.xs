@@ -112,26 +112,23 @@ static AV* probe_settings(const char* file, int line)
     AV* settings = 0;
 
     rlines = hv_fetch(probe_hash, file, klen, 0);
-    if (rlines) {
-        lines = (HV*) SvRV(*rlines);
-    } else {
+    if (!rlines) {
         return 0;
     }
+    lines = (HV*) SvRV(*rlines);
 
     klen = sprintf(kstr, "%d", line);
     rsettings = hv_fetch(lines, kstr, klen, 0);
-    if (rsettings) {
-        if (!SvROK(*rsettings) || SvTYPE(SvRV(*rsettings)) != SVt_PVAV) {
-            croak("Devel::Probe settings must be an ARRAY ref");
-        }
-
-        settings = (AV*) SvRV(*rsettings);
-        return settings;
-    } else {
+    if (!rsettings) {
         return 0;
     }
 
-    return 0;
+    if (!SvROK(*rsettings) || SvTYPE(SvRV(*rsettings)) != SVt_PVAV) {
+        croak("Devel::Probe settings must be an ARRAY ref");
+    }
+
+    settings = (AV*) SvRV(*rsettings);
+    return settings;
 }
 
 /*
