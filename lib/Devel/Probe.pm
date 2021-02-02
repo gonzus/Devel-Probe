@@ -6,7 +6,7 @@ use Storable qw(dclone);
 use XSLoader;
 use Carp qw(croak);
 
-our $VERSION = '0.000005';
+our $VERSION = '0.000006';
 XSLoader::load( 'Devel::Probe', $VERSION );
 
 sub import {
@@ -80,7 +80,7 @@ Devel::Probe - Quick & dirty code probes for Perl
 
 =head1 VERSION
 
-Version 0.000005
+Version 0.000006
 
 =head1 SYNOPSIS
 
